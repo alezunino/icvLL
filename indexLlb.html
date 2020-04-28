@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+   <title>Índice de Calidad de Vida - IGEHCS & ISISTAN (UNCPBA & CONICET)</title>
+   <meta charset="utf-8" />
+
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+      integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+      crossorigin="" />
+   <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+      integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+      crossorigin=""></script>
+
+   <!-- Load Esri Leaflet from CDN -->
+   <script src="https://unpkg.com/esri-leaflet@2.3.3/dist/esri-leaflet.js"
+      integrity="sha512-cMQ5e58BDuu1pr9BQ/eGRn6HaR6Olh0ofcHFWe5XesdCITVuSBiBZZbhCijBe5ya238f/zMMRYIMIIg1jxv4sQ=="
+      crossorigin=""></script>
+
+   <style type="text/css">
+      body {
+         margin: 0;
+         padding: 0;
+      }
+
+      #map {
+         position: absolute;
+         top: 0;
+         bottom: 0;
+         width: 100%;
+      }
+
+      /*
+      #zoom_level {
+         z-index: 10000;
+         position: absolute;
+         right: 10px;
+         top: 10px;
+         background-color: rgba(255, 255, 255, 0.5);
+         padding: 0 2px;
+      }*/
+   </style>
+   <!--
+   <script src="https://code.jquery.com/jquery-1.12.4.min.js"
+      integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+-->
+   <link rel="stylesheet" href="https://unpkg.com/leaflet-search@2.9.8/src/leaflet-search.css" />
+   <script src="https://unpkg.com/leaflet-search@2.9.8/src/leaflet-search.js"></script>
+
+
+</head>
+
+<body>
+
+   <div id="map">
+      <!--      <div id="zoom_level"></div>-->
+   </div>
+   <div id="location" style="display: none;"></div>
+   <script type="text/javascript">
+      var MIN_LEVEL = 3;
+      var MAX_LEVEL = 18;
+      /*
+            function updateZoomLevel() {
+               $("#zoom_level").html("Level " + map.getZoom())
+            }
+      
+            $(document).ready(function () {
+               updateZoomLevel();
+            });
+      */
+
+
+
+      var icvLayer = L.tileLayer('https://api.mapbox.com/styles/v1/azunino/ck8nrrf3611nv1jpj33wavtyq/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYXp1bmlubyIsImEiOiJjand0czBvc24wZ2l5NDhucnc2Ym9zNXNiIn0.tAtTepUSFqApaOQygq_9iw', { maxZoom: MAX_LEVEL, opacity: 0.7 });
+      //      var icvLayer = L.tileLayer('https://api.mapbox.com/styles/v1/azunino/ck8lsp90j10rp1jo0aoxc3x1j/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYXp1bmlubyIsImEiOiJjand0czBvc24wZ2l5NDhucnc2Ym9zNXNiIn0.tAtTepUSFqApaOQygq_9iw', { maxZoom: MAX_LEVEL });
+      /*
+            var tilesets = {
+               //       "basic": L.tileLayer('./raster/{z}/{x}/{y}.png', { maxZoom: MAX_LEVEL })
+               //https://api.mapbox.com/styles/v1/YOUR_USERNAME/YOUR_STYLE_ID/tiles/256/{z}/{x}/{y}?access_token=YOUR_ACCESS_TOKEN
+               "basic": icvLayer
+               //       "basic": L.tileLayer('https://icv-tiles.herokuapp.com/icv/{z}/{x}/{y}.jpg', { maxZoom: MAX_LEVEL })
+            };
+      */
+      //      var baseLayer = L.esri.basemapLayer('Gray');
+
+      var baseLayer = L.tileLayer.wms('https://wms.ign.gob.ar/geoserver/gwc/service/wms', {
+         layers: 'capabaseargenmap',
+         format: 'image/png',
+      });
+
+
+      var map = L.map('map', {
+         zoomSnap: 0, zoomDelta: 0.1, scrollWheelZoom: true,
+         layers: [baseLayer, icvLayer]
+      }).fitBounds([
+         [-21.781168, -53.6374515],
+         [-55.1850761, -73.5605371]
+      ]);
+      //setView([-30,-60], 4);
+
+      //  map.options.minZoom = MIN_LEVEL;
+      //  map.options.maxZoom = MAX_LEVEL;
+      /*
+            function updateZoomLevel() {
+               console.log(map.getZoom());
+            }
+      
+            map.on('zoomend', updateZoomLevel);
+      */
+      //      L.control.layers(tilesets, null, { position: 'bottomright' }).addTo(map);
+
+      const locationParentElement = document.getElementById('location').parentNode;
+
+      var lastSearchResults = {};
+
+      function formatJSON(rawjson) {	//callback that remap fields name
+         var json = {},
+            key, loc, disp = [];
+         lastSearchResults = {};
+
+         var element = document.getElementById('location');
+         if (element != null)
+            element.parentNode.removeChild(element);
+
+         for (var i in rawjson) {
+            disp = rawjson[i].display_name.split(',');
+            key = disp[0] + ', ' + disp[1];
+            loc = L.latLng(rawjson[i].lat, rawjson[i].lon);
+            //console.log(rawjson[i].boundingbox);//"-33.0348662", "-32.8696532", "-60.7832623", "-60.6116695"
+            lastSearchResults[i] = rawjson[i];
+            json[key] = loc;	//key,value format
+         }
+
+         return json;
+      }
+
+      const animSearch = new URLSearchParams(window.location.search).has('anim') ? 1 : 0;
+      /*
+            baseLayer.on('loading', function (event) {
+          map.fireEvent('dataloading', event);
+      });
+      
+      baseLayer.on('load', function (event) {
+          map.fireEvent('dataload', event);
+      });
+      
+      icvLayer.on('loading', function (event) {
+          map.fireEvent('dataloading', event);
+      });
+      
+      icvLayer.on('load', function (event) {
+          map.fireEvent('dataload', event);
+      });
+      */
+/*
+  no tiene este evento
+   map.on('idle', function () {
+         console.log('idle');
+      });
+*/
+      function setLocation() {
+         console.log("rendercomplete");
+         const newElement = document.createElement("div");
+         newElement.setAttribute('id', 'location');
+         newElement.style.display = "none";
+         locationParentElement.appendChild(newElement);
+         document.title = lastSearchResults[0].display_name;
+      }
+
+      function moveToLoc(latlng, title, map) {
+         //	this._map.setView(latlng, this.options.zoom);
+         var result = lastSearchResults[0].boundingbox;
+         //- min lat / bottom-left Latitude
+         //- max lat / top-right Latitude
+         //- min lon / bottom-left Longitude
+         //- max lon / top-right Longitude
+         var bbox = [[result[0], result[2]], [result[1], result[3]]]
+         //map.panTo(latlng);
+
+         map.once('moveend zoomend', function () {
+            console.log("moveend || zoomend");
+            setLocation();
+         });
+
+         if (animSearch) {
+            map.flyToBounds(bbox);
+         } else {
+            map.fitBounds(bbox);
+         }
+
+
+
+      };
+
+
+      var searchOpts = {
+         //         url: 'http://nominatim.openstreetmap.org/search?format=json&q={s}&countrycodes=AR&accept-language=es&addressdetails=1&namedetails=1',
+         url: 'https://us1.locationiq.com/v1/search.php?format=json&key=0e7dd68b4a8a12&q={s}&countrycodes=AR&accept-language=es&no_annotations=0&addressdetails=1&namedetails=1',
+         jsonpParam: 'json_callback',
+         formatData: formatJSON,
+         minLength: 5,
+         moveToLocation: moveToLoc,
+         autoType: false,
+         marker: {
+            icon: false,
+            animate: false
+         }
+      };
+
+      map.addControl(new L.Control.Search(searchOpts));
+
+   </script>
+</body>
+
+</html>
